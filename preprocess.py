@@ -165,6 +165,13 @@ plt.show()
 # %%
 print(df.shape)
 
+# Feature Selection
+# Drop index or identifier columns
+if 'Unnamed: 0' in df.columns:
+    df = df.drop(columns=['Unnamed: 0'])
+
+print(df.head())
+
 # %%
 from sklearn.model_selection import train_test_split
 
