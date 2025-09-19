@@ -1,0 +1,36 @@
+# VANET Misbehavior Detection with XAI Configuration
+
+data:
+  raw_data_path: 'data/raw'
+  processed_data_path: 'data/processed'
+  synthetic_data_path: 'data/synthetic'
+  train_ratio: 0.7
+  val_ratio: 0.15
+  test_ratio: 0.15
+
+preprocessing:
+  sequence_length: 10
+  feature_scaling: true
+  class_balancing: true
+
+model:
+  cnn:
+    filters: [64, 128]
+    kernel_size: 3
+    dense_units: 256
+    dropout_rate: 0.3
+  lstm:
+    units: [128, 64]
+    dropout_rate: 0.3
+  ensemble:
+    weights: [0.4, 0.4, 0.2]
+
+training:
+  batch_size: 32
+  epochs: 50
+  learning_rate: 0.001
+  early_stopping_patience: 10
+
+explainability:
+  shap_background_samples: 100
+  lime_num_features: 10
