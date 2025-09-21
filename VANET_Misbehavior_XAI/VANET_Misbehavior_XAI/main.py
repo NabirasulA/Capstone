@@ -26,14 +26,22 @@ def parse_args():
     parser.add_argument('--model_path', type=str, default=None, help='Path to saved model (for evaluate/explain mode)')
     parser.add_argument('--epochs', type=int, default=None, help='Override number of training epochs')
     parser.add_argument('--batch_size', type=int, default=None, help='Override training batch size')
+    parser.add_argument('--rows_limit', type=int, default=None, help='Only load the first N rows from the CSV (for quick tests)')
+    parser.add_argument('--cache_npz', type=str, default=None, help='Path to a .npz cache file to speed up subsequent loads')
     return parser.parse_args()
 
-def train(config, data_path, logger):
+def train(config, data_path, logger, rows_limit=None, cache_npz=None):
     logger.info("Starting training process")
     
     # Load and preprocess data
     with Timer("Data loading"):
-        data_loader = VANETDataLoader(data_path)
+        effective_rows_limit = rows_limit if rows_limit is not None else config.get('data.rows_limit')
+        data_loader = VANETDataLoader(
+            data_path,
+            rows_limit=effective_rows_limit,
+            cache_npz=cache_npz,
+            use_cache=True
+        )
         X, y = data_loader.load_veremi_data()
     
     # Feature extraction
@@ -250,9 +258,18 @@ def main():
         config.set('training.epochs', args.epochs)
     if args.batch_size is not None:
         config.set('training.batch_size', args.batch_size)
+    if args.rows_limit is not None:
+        # Keep this in config as well so it is visible to any downstream callers
+        config.set('data.rows_limit', args.rows_limit)
     
     if args.mode == 'train':
-        train(config, effective_data_path, logger)
+        train(
+            config,
+            effective_data_path,
+            logger,
+            rows_limit=config.get('data.rows_limit'),
+            cache_npz=args.cache_npz,
+        )
     elif args.mode == 'evaluate':
         if args.model_path is None:
             logger.error("Model path must be provided for evaluate mode")
