@@ -39,10 +39,24 @@ def train(config, data_path, logger):
         feature_extractor = VANETFeatureExtractor(window_size=config.get('preprocessing.sequence_length'))
         temporal_features = feature_extractor.extract_temporal_features(X)
         communication_features = feature_extractor.extract_communication_features(X)
+        # Debug shapes
+        logger.info(f"Raw features shape: {np.asarray(X).shape}")
+        logger.info(f"Temporal features shape: {np.asarray(temporal_features).shape}")
+        logger.info(f"Communication features shape: {np.asarray(communication_features).shape}")
+        # Defensive fixes
+        if temporal_features is None or np.asarray(temporal_features).ndim == 0:
+            logger.error("Temporal features are empty. Please verify dataset columns.")
+            return
+        temporal_features = np.asarray(temporal_features)
+        if temporal_features.ndim == 1:
+            temporal_features = temporal_features.reshape(-1, 1)
     
     # Prepare data for different models
     sequence_length = config.get('preprocessing.sequence_length')
-    num_features = temporal_features.shape[1] // sequence_length
+    if temporal_features.shape[1] == 0:
+        logger.error("No feature columns after feature extraction. Aborting.")
+        return
+    num_features = temporal_features.shape[1] // sequence_length if temporal_features.shape[1] >= sequence_length else temporal_features.shape[1]
     num_classes = len(np.unique(y))
     
     # Reshape data for CNN and LSTM models
