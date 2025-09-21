@@ -24,6 +24,8 @@ def parse_args():
     parser.add_argument('--mode', type=str, choices=['train', 'evaluate', 'explain'], default='train',
                         help='Operation mode')
     parser.add_argument('--model_path', type=str, default=None, help='Path to saved model (for evaluate/explain mode)')
+    parser.add_argument('--epochs', type=int, default=None, help='Override number of training epochs')
+    parser.add_argument('--batch_size', type=int, default=None, help='Override training batch size')
     return parser.parse_args()
 
 def train(config, data_path, logger):
@@ -92,56 +94,66 @@ def train(config, data_path, logger):
     # Train models
     os.makedirs('results/models', exist_ok=True)
     with Timer("CNN training"):
-        cnn_history = cnn.fit(
-            X_train_cnn, y_train,
-            batch_size=config.get('training.batch_size'),
-            epochs=config.get('training.epochs'),
-            validation_split=0.2,
-            callbacks=[
-                tf.keras.callbacks.EarlyStopping(
-                    patience=config.get('training.early_stopping_patience'),
-                    restore_best_weights=True
-                ),
-                tf.keras.callbacks.ModelCheckpoint(
-                    filepath='results/models/cnn_epoch_{epoch:02d}.weights.h5',
-                    save_weights_only=True,
-                    save_freq='epoch'
-                ),
-                tf.keras.callbacks.ModelCheckpoint(
-                    filepath='results/models/cnn_best.weights.h5',
-                    save_weights_only=True,
-                    monitor='val_accuracy',
-                    mode='max',
-                    save_best_only=True
-                )
-            ]
-        )
-    
+        try:
+            cnn_history = cnn.fit(
+                X_train_cnn, y_train,
+                batch_size=config.get('training.batch_size'),
+                epochs=config.get('training.epochs'),
+                validation_split=0.2,
+                callbacks=[
+                    tf.keras.callbacks.EarlyStopping(
+                        patience=config.get('training.early_stopping_patience'),
+                        restore_best_weights=True
+                    ),
+                    tf.keras.callbacks.ModelCheckpoint(
+                        filepath='results/models/cnn_epoch_{epoch:02d}.weights.h5',
+                        save_weights_only=True,
+                        save_freq='epoch'
+                    ),
+                    tf.keras.callbacks.ModelCheckpoint(
+                        filepath='results/models/cnn_best.weights.h5',
+                        save_weights_only=True,
+                        monitor='val_accuracy',
+                        mode='max',
+                        save_best_only=True
+                    )
+                ]
+            )
+        except KeyboardInterrupt:
+            logger.warning("CNN training interrupted. Saving current weights.")
+            cnn.save_weights('results/models/cnn_interrupted.weights.h5')
+            return
+        
     with Timer("LSTM training"):
-        lstm_history = lstm.fit(
-            X_train_lstm, y_train,
-            batch_size=config.get('training.batch_size'),
-            epochs=config.get('training.epochs'),
-            validation_split=0.2,
-            callbacks=[
-                tf.keras.callbacks.EarlyStopping(
-                    patience=config.get('training.early_stopping_patience'),
-                    restore_best_weights=True
-                ),
-                tf.keras.callbacks.ModelCheckpoint(
-                    filepath='results/models/lstm_epoch_{epoch:02d}.weights.h5',
-                    save_weights_only=True,
-                    save_freq='epoch'
-                ),
-                tf.keras.callbacks.ModelCheckpoint(
-                    filepath='results/models/lstm_best.weights.h5',
-                    save_weights_only=True,
-                    monitor='val_accuracy',
-                    mode='max',
-                    save_best_only=True
-                )
-            ]
-        )
+        try:
+            lstm_history = lstm.fit(
+                X_train_lstm, y_train,
+                batch_size=config.get('training.batch_size'),
+                epochs=config.get('training.epochs'),
+                validation_split=0.2,
+                callbacks=[
+                    tf.keras.callbacks.EarlyStopping(
+                        patience=config.get('training.early_stopping_patience'),
+                        restore_best_weights=True
+                    ),
+                    tf.keras.callbacks.ModelCheckpoint(
+                        filepath='results/models/lstm_epoch_{epoch:02d}.weights.h5',
+                        save_weights_only=True,
+                        save_freq='epoch'
+                    ),
+                    tf.keras.callbacks.ModelCheckpoint(
+                        filepath='results/models/lstm_best.weights.h5',
+                        save_weights_only=True,
+                        monitor='val_accuracy',
+                        mode='max',
+                        save_best_only=True
+                    )
+                ]
+            )
+        except KeyboardInterrupt:
+            logger.warning("LSTM training interrupted. Saving current weights.")
+            lstm.save_weights('results/models/lstm_interrupted.weights.h5')
+            return
     
     # Save models
     os.makedirs('results/models', exist_ok=True)
@@ -232,6 +244,12 @@ def main():
     # Setup logging
     os.makedirs('results/logs', exist_ok=True)
     logger = setup_logger('vanet_xai', 'results/logs/vanet_xai.log')
+    
+    # Apply CLI overrides to config if provided
+    if args.epochs is not None:
+        config.set('training.epochs', args.epochs)
+    if args.batch_size is not None:
+        config.set('training.batch_size', args.batch_size)
     
     if args.mode == 'train':
         train(config, effective_data_path, logger)
