@@ -17,6 +17,22 @@ from src.evaluation.metrics import calculate_classification_metrics
 from src.utils.config import Config
 from src.utils.logging_utils import setup_logger, Timer
 
+def setup_gpu(logger):
+    """Enable GPU memory growth and report available devices."""
+    try:
+        gpus = tf.config.list_physical_devices('GPU')
+        if gpus:
+            for gpu in gpus:
+                try:
+                    tf.config.experimental.set_memory_growth(gpu, True)
+                except Exception:
+                    pass
+            logger.info(f"GPUs available: {gpus}")
+        else:
+            logger.info("No GPU detected; running on CPU.")
+    except Exception as e:
+        logger.warning(f"GPU setup encountered an issue: {e}")
+
 def parse_args():
     parser = argparse.ArgumentParser(description='VANET Misbehavior Detection with XAI')
     parser.add_argument('--config', type=str, default='config.yaml', help='Path to config file')
@@ -163,10 +179,10 @@ def train(config, data_path, logger, rows_limit=None, cache_npz=None):
             lstm.save_weights('results/models/lstm_interrupted.weights.h5')
             return
     
-    # Save models
+        # Save models (Keras 3 requires explicit extension)
     os.makedirs('results/models', exist_ok=True)
-    cnn.save('results/models/cnn_model')
-    lstm.save('results/models/lstm_model')
+    cnn.save('results/models/cnn_model.keras')
+    lstm.save('results/models/lstm_model.keras')
     
     # Evaluate models
     cnn_pred = cnn.predict(X_test_cnn)
@@ -252,6 +268,9 @@ def main():
     # Setup logging
     os.makedirs('results/logs', exist_ok=True)
     logger = setup_logger('vanet_xai', 'results/logs/vanet_xai.log')
+
+    # Setup GPU (if available)
+    setup_gpu(logger)
     
     # Apply CLI overrides to config if provided
     if args.epochs is not None:
