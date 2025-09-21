@@ -20,7 +20,7 @@ from src.utils.logging_utils import setup_logger, Timer
 def parse_args():
     parser = argparse.ArgumentParser(description='VANET Misbehavior Detection with XAI')
     parser.add_argument('--config', type=str, default='config.yaml', help='Path to config file')
-    parser.add_argument('--data_path', type=str, default='data/raw', help='Path to raw data')
+    parser.add_argument('--data_path', type=str, default=None, help='Path to raw data directory or CSV file (defaults to config value)')
     parser.add_argument('--mode', type=str, choices=['train', 'evaluate', 'explain'], default='train',
                         help='Operation mode')
     parser.add_argument('--model_path', type=str, default=None, help='Path to saved model (for evaluate/explain mode)')
@@ -186,23 +186,26 @@ def main():
     
     # Setup config
     config = Config(args.config)
+
+    # Resolve data path: CLI arg takes precedence, otherwise use config value
+    effective_data_path = args.data_path or config.get('data.raw_data_path')
     
     # Setup logging
     os.makedirs('results/logs', exist_ok=True)
     logger = setup_logger('vanet_xai', 'results/logs/vanet_xai.log')
     
     if args.mode == 'train':
-        train(config, args.data_path, logger)
+        train(config, effective_data_path, logger)
     elif args.mode == 'evaluate':
         if args.model_path is None:
             logger.error("Model path must be provided for evaluate mode")
             return
-        evaluate(config, args.model_path, args.data_path, logger)
+        evaluate(config, args.model_path, effective_data_path, logger)
     elif args.mode == 'explain':
         if args.model_path is None:
             logger.error("Model path must be provided for explain mode")
             return
-        explain(config, args.model_path, args.data_path, logger)
+        explain(config, args.model_path, effective_data_path, logger)
 
 if __name__ == "__main__":
     main()
