@@ -7,7 +7,7 @@ class Config:
         self.config = {
             # Default configuration values
             'data': {
-                'raw_data_path': '../data/raw',
+                'raw_data_path': '/content/drive/MyDrive/Datasets',
                 'processed_data_path': '../data/processed',
                 'synthetic_data_path': '../data/synthetic',
                 'train_ratio': 0.7,
