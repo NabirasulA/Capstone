@@ -5,20 +5,35 @@ from sklearn.preprocessing import StandardScaler, LabelEncoder
 import os
 
 class VANETDataLoader:
-    def __init__(self, data_path):
+    def __init__(self, data_path, rows_limit=None, cache_npz=None, use_cache=True):
         self.data_path = data_path
+        self.rows_limit = rows_limit
+        self.cache_npz = cache_npz
+        self.use_cache = use_cache
         self.scaler = StandardScaler()
         self.label_encoder = LabelEncoder()
     
     def load_veremi_data(self):
-        # Load VeReMi dataset with position falsification attacks
-        # Accept either a directory containing 'veremi_dataset.csv' or a direct CSV file path
+        """Load VeReMi dataset with optional caching and row limiting."""
+        # Load from cache if available
+        if self.use_cache and self.cache_npz and os.path.exists(self.cache_npz):
+            cached = np.load(self.cache_npz)
+            return cached['X'], cached['y']
+        # Resolve CSV path
         csv_path = self.data_path
         if os.path.isdir(csv_path):
             csv_path = os.path.join(csv_path, 'veremi_dataset.csv')
-        
-        data = pd.read_csv(csv_path)
-        return self.preprocess_data(data)
+        # Read CSV (optionally limited rows)
+        if self.rows_limit is not None and self.rows_limit > 0:
+            data = pd.read_csv(csv_path, nrows=int(self.rows_limit))
+        else:
+            data = pd.read_csv(csv_path)
+        X, y = self.preprocess_data(data)
+        # Save cache
+        if self.cache_npz:
+            os.makedirs(os.path.dirname(self.cache_npz), exist_ok=True)
+            np.savez(self.cache_npz, X=X, y=y)
+        return X, y
     
     def preprocess_data(self, data):
         """Basic preprocessing: numeric feature matrix + encoded labels."""
