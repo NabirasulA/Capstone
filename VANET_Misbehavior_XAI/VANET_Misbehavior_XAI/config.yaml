@@ -26,8 +26,8 @@ model:
     weights: [0.4, 0.4, 0.2]
 
 training:
-  batch_size: 32
-  epochs: 50
+  batch_size: 16
+  epochs: 3
   learning_rate: 0.001
   early_stopping_patience: 10
 
