@@ -2,6 +2,7 @@
 import pandas as pd
 import numpy as np
 from sklearn.preprocessing import StandardScaler, LabelEncoder
+import os
 
 class VANETDataLoader:
     def __init__(self, data_path):
@@ -11,7 +12,12 @@ class VANETDataLoader:
     
     def load_veremi_data(self):
         # Load VeReMi dataset with position falsification attacks
-        data = pd.read_csv(self.data_path + '/veremi_dataset.csv')
+        # Accept either a directory containing 'veremi_dataset.csv' or a direct CSV file path
+        csv_path = self.data_path
+        if os.path.isdir(csv_path):
+            csv_path = os.path.join(csv_path, 'veremi_dataset.csv')
+        
+        data = pd.read_csv(csv_path)
         return self.preprocess_data(data)
     
     def preprocess_data(self, data):
