@@ -21,17 +21,39 @@ class VANETDataLoader:
         return self.preprocess_data(data)
     
     def preprocess_data(self, data):
-        # Feature engineering for VANET-specific features
+        """Basic preprocessing: numeric feature matrix + encoded labels."""
         features = self.extract_behavioral_features(data)
         labels = self.encode_attack_labels(data)
         return features, labels
     
     def extract_behavioral_features(self, data):
-        # Extract movement patterns, communication behavior, temporal features
-        behavioral_features = []
-        # Implementation based on [21][22]
-        return np.array(behavioral_features)
+        """Extract a numeric feature matrix from the dataframe.
+        - Select numeric columns (exclude common label columns if present)
+        - Fill missing values with median
+        - Standard scale
+        """
+        df = data.copy()
+        # Drop obvious label columns from features
+        label_cols = [c for c in ['attack_type', 'label', 'target'] if c in df.columns]
+        feature_df = df.drop(columns=label_cols, errors='ignore')
+        # Keep only numeric columns
+        feature_df = feature_df.select_dtypes(include=[np.number])
+        if feature_df.shape[1] == 0:
+            # Fall back: attempt to coerce all non-numeric to numeric
+            feature_df = df.apply(pd.to_numeric, errors='coerce')
+        # Fill missing values
+        feature_df = feature_df.fillna(feature_df.median(numeric_only=True))
+        # Scale
+        features = self.scaler.fit_transform(feature_df.values)
+        return features
     
     def encode_attack_labels(self, data):
-        # Encode attack types into numerical labels
-        return self.label_encoder.fit_transform(data['attack_type'])
+        """Encode labels robustly. Prefer 'attack_type', else 'label'/'target'. If none found, return zeros."""
+        label_series = None
+        for col in ['attack_type', 'label', 'target']:
+            if col in data.columns:
+                label_series = data[col]
+                break
+        if label_series is None:
+            return np.zeros(len(data), dtype=int)
+        return self.label_encoder.fit_transform(label_series.astype(str))
