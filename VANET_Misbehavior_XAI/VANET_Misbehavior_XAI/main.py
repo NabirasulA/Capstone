@@ -90,6 +90,7 @@ def train(config, data_path, logger):
         )
     
     # Train models
+    os.makedirs('results/models', exist_ok=True)
     with Timer("CNN training"):
         cnn_history = cnn.fit(
             X_train_cnn, y_train,
@@ -100,6 +101,18 @@ def train(config, data_path, logger):
                 tf.keras.callbacks.EarlyStopping(
                     patience=config.get('training.early_stopping_patience'),
                     restore_best_weights=True
+                ),
+                tf.keras.callbacks.ModelCheckpoint(
+                    filepath='results/models/cnn_epoch_{epoch:02d}.weights.h5',
+                    save_weights_only=True,
+                    save_freq='epoch'
+                ),
+                tf.keras.callbacks.ModelCheckpoint(
+                    filepath='results/models/cnn_best.weights.h5',
+                    save_weights_only=True,
+                    monitor='val_accuracy',
+                    mode='max',
+                    save_best_only=True
                 )
             ]
         )
@@ -114,6 +127,18 @@ def train(config, data_path, logger):
                 tf.keras.callbacks.EarlyStopping(
                     patience=config.get('training.early_stopping_patience'),
                     restore_best_weights=True
+                ),
+                tf.keras.callbacks.ModelCheckpoint(
+                    filepath='results/models/lstm_epoch_{epoch:02d}.weights.h5',
+                    save_weights_only=True,
+                    save_freq='epoch'
+                ),
+                tf.keras.callbacks.ModelCheckpoint(
+                    filepath='results/models/lstm_best.weights.h5',
+                    save_weights_only=True,
+                    monitor='val_accuracy',
+                    mode='max',
+                    save_best_only=True
                 )
             ]
         )
