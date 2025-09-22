@@ -289,7 +289,12 @@ def explain(config, model_path, data_path, logger, rows_limit=None, cache_npz=No
     model = tf.keras.models.load_model(model_path)
     
     # Setup explainers
-    shap_explainer = SHAPExplainer(model, model_type='kernel')  # Use kernel for TF 2.x compatibility
+    shap_explainer = SHAPExplainer(
+        model,
+        model_type='kernel',
+        sequence_length=sequence_length,
+        num_features=num_features
+    )  # Use kernel for TF 2.x compatibility
     
     # Generate explanations
     background_data = X_model[:config.get('explainability.shap_background_samples')]
@@ -299,11 +304,19 @@ def explain(config, model_path, data_path, logger, rows_limit=None, cache_npz=No
     sample_indices = np.random.choice(len(X_model), 10, replace=False)
     sample_data = X_model[sample_indices]
     
-    shap_values = shap_explainer.explain_dataset(sample_data)
+    # For sequence models, flatten the temporal dimension for SHAP
+    # SHAP expects 2D input, so we flatten sequence_length × num_features
+    flattened_sample_data = sample_data.reshape(sample_data.shape[0], -1)
+    flattened_background = background_data.reshape(background_data.shape[0], -1)
+
+    # Update the explainer with flattened data
+    shap_explainer.setup_explainer(flattened_background)
+
+    shap_values = shap_explainer.explain_dataset(flattened_sample_data)
     
-    # Plot explanations
+    # Plot explanations (use flattened data for feature names)
     os.makedirs('results/plots', exist_ok=True)
-    fig = shap_explainer.plot_summary(shap_values, sample_data)
+    fig = shap_explainer.plot_summary(shap_values, flattened_sample_data)
     fig.savefig('results/plots/shap_summary.png')
     
     logger.info("Explanations generated and saved to results/plots/")
