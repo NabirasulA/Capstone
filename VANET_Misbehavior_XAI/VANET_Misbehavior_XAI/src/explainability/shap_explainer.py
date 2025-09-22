@@ -4,24 +4,43 @@ import shap
 import matplotlib.pyplot as plt
 
 class SHAPExplainer:
-    def __init__(self, model, model_type='deep'):
+    def __init__(self, model, model_type='deep', sequence_length=None, num_features=None):
         self.model = model
         self.model_type = model_type
         self.explainer = None
+        self.sequence_length = sequence_length
+        self.num_features = num_features
     
     def setup_explainer(self, background_data):
         """Initialize the SHAP explainer with background data"""
         if self.model_type == 'deep':
             # Use KernelExplainer for better TF 2.x compatibility
             try:
-                self.explainer = shap.DeepExplainer(self.model, background_data)
+                # For sequence models, we need to reshape data for model prediction
+                if self.sequence_length and self.num_features:
+                    reshaped_background = background_data.reshape(-1, self.sequence_length, self.num_features)
+                    self.explainer = shap.DeepExplainer(self.model, reshaped_background)
+                else:
+                    self.explainer = shap.DeepExplainer(self.model, background_data)
             except Exception:
                 # Fallback to KernelExplainer if DeepExplainer fails
-                self.explainer = shap.KernelExplainer(self.model.predict, background_data)
+                if self.sequence_length and self.num_features:
+                    def model_predict(data):
+                        reshaped = data.reshape(-1, self.sequence_length, self.num_features)
+                        return self.model.predict(reshaped)
+                    self.explainer = shap.KernelExplainer(model_predict, background_data)
+                else:
+                    self.explainer = shap.KernelExplainer(self.model.predict, background_data)
         elif self.model_type == 'tree':
             self.explainer = shap.TreeExplainer(self.model)
         elif self.model_type == 'kernel':
-            self.explainer = shap.KernelExplainer(self.model.predict, background_data)
+            if self.sequence_length and self.num_features:
+                def model_predict(data):
+                    reshaped = data.reshape(-1, self.sequence_length, self.num_features)
+                    return self.model.predict(reshaped)
+                self.explainer = shap.KernelExplainer(model_predict, background_data)
+            else:
+                self.explainer = shap.KernelExplainer(self.model.predict, background_data)
     
     def explain_instance(self, instance):
         """Generate SHAP values for a single instance"""
@@ -36,7 +55,12 @@ class SHAPExplainer:
             else:
                 return [shap_values]
         else:
-            shap_values = self.explainer.shap_values(instance)
+            # DeepExplainer expects 3D input
+            if self.sequence_length and self.num_features:
+                reshaped_instance = instance.reshape(-1, self.sequence_length, self.num_features)
+            else:
+                reshaped_instance = instance
+            shap_values = self.explainer.shap_values(reshaped_instance)
             return shap_values
     
     def explain_dataset(self, data):
@@ -52,7 +76,12 @@ class SHAPExplainer:
             else:
                 return [shap_values]
         else:
-            shap_values = self.explainer.shap_values(data)
+            # DeepExplainer expects 3D input
+            if self.sequence_length and self.num_features:
+                reshaped_data = data.reshape(-1, self.sequence_length, self.num_features)
+            else:
+                reshaped_data = data
+            shap_values = self.explainer.shap_values(reshaped_data)
             return shap_values
     
     def plot_summary(self, shap_values, features, feature_names=None):
