@@ -86,14 +86,42 @@ class SHAPExplainer:
     
     def plot_summary(self, shap_values, features, feature_names=None):
         """Plot SHAP summary plot"""
-        # Handle list format from KernelExplainer
-        if isinstance(shap_values, list) and len(shap_values) > 0:
-            shap_values_to_plot = shap_values[0]  # Use first class for summary
-        else:
-            shap_values_to_plot = shap_values
+        try:
+            # Handle list format from KernelExplainer
+            if isinstance(shap_values, list) and len(shap_values) > 0:
+                shap_values_to_plot = shap_values[0]  # Use first class for summary
+            else:
+                shap_values_to_plot = shap_values
 
-        shap.summary_plot(shap_values_to_plot, features, feature_names=feature_names)
-        return plt.gcf()
+        # Check if we have valid SHAP values
+            if shap_values_to_plot is None or len(shap_values_to_plot) == 0:
+                print("Warning: No SHAP values to plot")
+                return plt.figure()
+
+            # Debug: Print SHAP values shape and some values
+            print(f"SHAP values shape: {np.array(shap_values_to_plot).shape}")
+            print(f"Features shape: {np.array(features).shape}")
+            print(f"Sample SHAP values: {shap_values_to_plot[:3] if len(shap_values_to_plot) > 3 else shap_values_to_plot}")
+
+            # Create feature names if not provided
+            if feature_names is None:
+                if len(features.shape) > 1:
+                    feature_names = [f"Feature_{i}" for i in range(features.shape[1])]
+                else:
+                    feature_names = [f"Feature_{i}" for i in range(len(features))]
+
+            # Generate summary plot
+            shap.summary_plot(shap_values_to_plot, features, feature_names=feature_names, show=False)
+
+            # Ensure the plot is properly created
+            fig = plt.gcf()
+            plt.tight_layout()
+            return fig
+        except Exception as e:
+            print(f"Error creating SHAP summary plot: {e}")
+            import traceback
+            traceback.print_exc()
+            return plt.figure()
     
     def plot_dependence(self, shap_values, features, feature_idx, feature_names=None):
         """Plot SHAP dependence plot for a specific feature"""
