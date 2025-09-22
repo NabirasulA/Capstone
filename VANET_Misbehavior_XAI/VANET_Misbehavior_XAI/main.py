@@ -289,7 +289,7 @@ def explain(config, model_path, data_path, logger, rows_limit=None, cache_npz=No
     model = tf.keras.models.load_model(model_path)
     
     # Setup explainers
-    shap_explainer = SHAPExplainer(model)
+    shap_explainer = SHAPExplainer(model, model_type='kernel')  # Use kernel for TF 2.x compatibility
     
     # Generate explanations
     background_data = X_model[:config.get('explainability.shap_background_samples')]
