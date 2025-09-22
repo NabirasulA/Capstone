@@ -207,11 +207,17 @@ def train(config, data_path, logger, rows_limit=None, cache_npz=None):
     
     return cnn, lstm, ensemble
 
-def evaluate(config, model_path, data_path, logger):
+def evaluate(config, model_path, data_path, logger, rows_limit=None, cache_npz=None):
     logger.info(f"Evaluating model from {model_path}")
     
     # Load data
-    data_loader = VANETDataLoader(data_path)
+    effective_rows_limit = rows_limit if rows_limit is not None else config.get('data.rows_limit')
+    data_loader = VANETDataLoader(
+        data_path,
+        rows_limit=effective_rows_limit,
+        cache_npz=cache_npz,
+        use_cache=True
+    )
     X, y = data_loader.load_veremi_data()
     
     # Load model
@@ -226,11 +232,17 @@ def evaluate(config, model_path, data_path, logger):
     
     return metrics
 
-def explain(config, model_path, data_path, logger):
+def explain(config, model_path, data_path, logger, rows_limit=None, cache_npz=None):
     logger.info(f"Generating explanations for model from {model_path}")
     
     # Load data
-    data_loader = VANETDataLoader(data_path)
+    effective_rows_limit = rows_limit if rows_limit is not None else config.get('data.rows_limit')
+    data_loader = VANETDataLoader(
+        data_path,
+        rows_limit=effective_rows_limit,
+        cache_npz=cache_npz,
+        use_cache=True
+    )
     X, y = data_loader.load_veremi_data()
     
     # Load model
@@ -293,12 +305,26 @@ def main():
         if args.model_path is None:
             logger.error("Model path must be provided for evaluate mode")
             return
-        evaluate(config, args.model_path, effective_data_path, logger)
+        evaluate(
+            config,
+            args.model_path,
+            effective_data_path,
+            logger,
+            rows_limit=config.get('data.rows_limit'),
+            cache_npz=args.cache_npz,
+        )
     elif args.mode == 'explain':
         if args.model_path is None:
             logger.error("Model path must be provided for explain mode")
             return
-        explain(config, args.model_path, effective_data_path, logger)
+        explain(
+            config,
+            args.model_path,
+            effective_data_path,
+            logger,
+            rows_limit=config.get('data.rows_limit'),
+            cache_npz=args.cache_npz,
+        )
 
 if __name__ == "__main__":
     main()
