@@ -220,11 +220,31 @@ def evaluate(config, model_path, data_path, logger, rows_limit=None, cache_npz=N
     )
     X, y = data_loader.load_veremi_data()
     
+    # Feature extraction (same as in train)
+    with Timer("Feature extraction"):
+        feature_extractor = VANETFeatureExtractor(window_size=config.get('preprocessing.sequence_length'))
+        temporal_features = feature_extractor.extract_temporal_features(X)
+        # Defensive fixes
+        if temporal_features is None or np.asarray(temporal_features).ndim == 0:
+            logger.error("Temporal features are empty. Please verify dataset columns.")
+            return
+        temporal_features = np.asarray(temporal_features)
+        if temporal_features.ndim == 1:
+            temporal_features = temporal_features.reshape(-1, 1)
+    
+    # Reshape for model input (same as in train)
+    sequence_length = config.get('preprocessing.sequence_length')
+    if temporal_features.shape[1] == 0:
+        logger.error("No feature columns after feature extraction. Aborting.")
+        return
+    num_features = temporal_features.shape[1] // sequence_length if temporal_features.shape[1] >= sequence_length else temporal_features.shape[1]
+    X_model = temporal_features.reshape(-1, sequence_length, num_features)
+    
     # Load model
     model = tf.keras.models.load_model(model_path)
     
     # Evaluate
-    y_pred = model.predict(X)
+    y_pred = model.predict(X_model)
     y_pred_classes = np.argmax(y_pred, axis=1)
     
     metrics = calculate_classification_metrics(y, y_pred_classes, y_pred)
@@ -245,6 +265,26 @@ def explain(config, model_path, data_path, logger, rows_limit=None, cache_npz=No
     )
     X, y = data_loader.load_veremi_data()
     
+    # Feature extraction (same as in train)
+    with Timer("Feature extraction"):
+        feature_extractor = VANETFeatureExtractor(window_size=config.get('preprocessing.sequence_length'))
+        temporal_features = feature_extractor.extract_temporal_features(X)
+        # Defensive fixes
+        if temporal_features is None or np.asarray(temporal_features).ndim == 0:
+            logger.error("Temporal features are empty. Please verify dataset columns.")
+            return
+        temporal_features = np.asarray(temporal_features)
+        if temporal_features.ndim == 1:
+            temporal_features = temporal_features.reshape(-1, 1)
+    
+    # Reshape for model input (same as in train)
+    sequence_length = config.get('preprocessing.sequence_length')
+    if temporal_features.shape[1] == 0:
+        logger.error("No feature columns after feature extraction. Aborting.")
+        return
+    num_features = temporal_features.shape[1] // sequence_length if temporal_features.shape[1] >= sequence_length else temporal_features.shape[1]
+    X_model = temporal_features.reshape(-1, sequence_length, num_features)
+    
     # Load model
     model = tf.keras.models.load_model(model_path)
     
@@ -252,12 +292,12 @@ def explain(config, model_path, data_path, logger, rows_limit=None, cache_npz=No
     shap_explainer = SHAPExplainer(model)
     
     # Generate explanations
-    background_data = X[:config.get('explainability.shap_background_samples')]
+    background_data = X_model[:config.get('explainability.shap_background_samples')]
     shap_explainer.setup_explainer(background_data)
     
     # Explain a sample of instances
-    sample_indices = np.random.choice(len(X), 10, replace=False)
-    sample_data = X[sample_indices]
+    sample_indices = np.random.choice(len(X_model), 10, replace=False)
+    sample_data = X_model[sample_indices]
     
     shap_values = shap_explainer.explain_dataset(sample_data)
     
