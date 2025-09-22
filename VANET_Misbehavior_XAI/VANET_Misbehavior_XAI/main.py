@@ -316,7 +316,15 @@ def explain(config, model_path, data_path, logger, rows_limit=None, cache_npz=No
     
     # Plot explanations (use flattened data for feature names)
     os.makedirs('results/plots', exist_ok=True)
-    fig = shap_explainer.plot_summary(shap_values, flattened_sample_data)
+    
+    # Create meaningful feature names for the flattened temporal features
+    total_features = sequence_length * num_features
+    feature_names = []
+    for t in range(sequence_length):
+        for f in range(num_features):
+            feature_names.append(f"T{t+1}_F{f+1}")
+
+    fig = shap_explainer.plot_summary(shap_values, flattened_sample_data, feature_names=feature_names)
     fig.savefig('results/plots/shap_summary.png')
     
     logger.info("Explanations generated and saved to results/plots/")
