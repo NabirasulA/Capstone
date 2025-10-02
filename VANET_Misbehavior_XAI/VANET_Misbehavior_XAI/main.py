@@ -326,7 +326,123 @@ def explain(config, model_path, data_path, logger, rows_limit=None, cache_npz=No
 
     fig = shap_explainer.plot_summary(shap_values, flattened_sample_data, feature_names=feature_names)
     fig.savefig('results/plots/shap_summary.png')
+
     
+def explain_ensemble(config, cnn_model_path, lstm_model_path, data_path, logger, rows_limit=None, cache_npz=None):
+    """Generate explanations for ensemble model combining CNN and LSTM"""
+    logger.info(f"Generating ensemble explanations for CNN: {cnn_model_path}, LSTM: {lstm_model_path}")
+
+    # Load data
+    effective_rows_limit = rows_limit if rows_limit is not None else config.get('data.rows_limit')
+    data_loader = VANETDataLoader(
+        data_path,
+        rows_limit=effective_rows_limit,
+        cache_npz=cache_npz,
+        use_cache=True
+    )
+    X, y = data_loader.load_veremi_data()
+
+    # Feature extraction (same as in train)
+    with Timer("Feature extraction"):
+        feature_extractor = VANETFeatureExtractor(window_size=config.get('preprocessing.sequence_length'))
+        temporal_features = feature_extractor.extract_temporal_features(X)
+        # Defensive fixes
+        if temporal_features is None or np.asarray(temporal_features).ndim == 0:
+            logger.error("Temporal features are empty. Please verify dataset columns.")
+            return
+        temporal_features = np.asarray(temporal_features)
+        if temporal_features.ndim == 1:
+            temporal_features = temporal_features.reshape(-1, 1)
+
+    # Reshape for model input (same as in train)
+    sequence_length = config.get('preprocessing.sequence_length')
+    if temporal_features.shape[1] == 0:
+        logger.error("No feature columns after feature extraction. Aborting.")
+        return
+    num_features = temporal_features.shape[1] // sequence_length if temporal_features.shape[1] >= sequence_length else temporal_features.shape[1]
+    X_model = temporal_features.reshape(-1, sequence_length, num_features)
+
+    # Load individual models
+    cnn_model = tf.keras.models.load_model(cnn_model_path)
+    lstm_model = tf.keras.models.load_model(lstm_model_path)
+
+    # Create ensemble explainer
+    ensemble_explainer = EnsembleExplainer(cnn_model, lstm_model)
+
+    # Setup individual model explainers with sequence parameters
+    cnn_explainer = SHAPExplainer(
+        cnn_model,
+        model_type='kernel',
+        sequence_length=sequence_length,
+        num_features=num_features
+    )
+    lstm_explainer = SHAPExplainer(
+        lstm_model,
+        model_type='kernel',
+        sequence_length=sequence_length,
+        num_features=num_features
+    )
+
+    # Update ensemble explainer with individual explainers
+    ensemble_explainer.cnn_explainer = cnn_explainer
+    ensemble_explainer.lstm_explainer = lstm_explainer
+
+    # Generate background data for SHAP
+    background_data = X_model[:config.get('explainability.shap_background_samples')]
+
+    # Setup explainers
+    cnn_explainer.setup_explainer(background_data)
+    lstm_explainer.setup_explainer(background_data)
+
+    # Explain sample instances
+    sample_indices = np.random.choice(len(X_model), 10, replace=False)
+    sample_data_cnn = X_model[sample_indices]
+    sample_data_lstm = X_model[sample_indices]  # CNN and LSTM use same input format
+
+    # Generate ensemble explanations
+    ensemble_explanations = ensemble_explainer.explain_ensemble_dataset(
+        sample_data_cnn, sample_data_lstm, sample_indices
+    )
+
+    # Create visualizations
+    os.makedirs('results/plots', exist_ok=True)
+
+    # 1. Model comparison visualization
+    fig_comparison, _ = ensemble_explainer.compare_model_explanations(
+        sample_data_cnn[0], sample_data_lstm[0]
+    )
+    fig_comparison.savefig('results/plots/ensemble_model_comparison.png')
+
+    # 2. Ensemble vs individual models comparison
+    fig_ensemble = ensemble_explainer.plot_ensemble_comparison(
+        sample_data_cnn, sample_data_lstm
+    )
+    fig_ensemble.savefig('results/plots/ensemble_feature_comparison.png')
+
+    # 3. Individual model SHAP plots for reference
+    # CNN SHAP
+    flattened_sample = sample_data_cnn.reshape(sample_data_cnn.shape[0], -1)
+    feature_names = []
+    for t in range(sequence_length):
+        for f in range(num_features):
+            feature_names.append(f"T{t+1}_F{f+1}")
+
+    cnn_shap_values = cnn_explainer.explain_dataset(flattened_sample)
+    fig_cnn = cnn_explainer.plot_summary(cnn_shap_values, flattened_sample, feature_names=feature_names)
+    fig_cnn.savefig('results/plots/ensemble_cnn_shap.png')
+
+    # LSTM SHAP
+    lstm_shap_values = lstm_explainer.explain_dataset(flattened_sample)
+    fig_lstm = lstm_explainer.plot_summary(lstm_shap_values, flattened_sample, feature_names=feature_names)
+    fig_lstm.savefig('results/plots/ensemble_lstm_shap.png')
+
+    # Generate summary report
+    logger.info("Ensemble explanations generated:")
+    logger.info(f"- Model comparison: results/plots/ensemble_model_comparison.png")
+    logger.info(f"- Feature comparison: results/plots/ensemble_feature_comparison.png")
+    logger.info(f"- CNN SHAP: results/plots/ensemble_cnn_shap.png")
+    logger.info(f"- LSTM SHAP: results/plots/ensemble_lstm_shap.png")
+
     logger.info("Explanations generated and saved to results/plots/")
 
 def main():
