@@ -131,7 +131,7 @@ class EnsembleExplainer:
 
         # Feature importance correlation
         correlation = np.corrcoef(cnn_shap_plot, lstm_shap_plot)[0, 1]
-        axes[1, 1].text(0.5, 0.5, f'CNN-LSTM SHAP\nCorrelation: {correlation".3f"}',
+        axes[1, 1].text(0.5, 0.5, f'CNN-LSTM SHAP\nCorrelation: {correlation:.3f}',
                         ha='center', va='center', transform=axes[1, 1].transAxes,
                         bbox=dict(boxstyle='round', facecolor='lightblue'))
         axes[1, 1].set_title('Model Explanation Correlation')
